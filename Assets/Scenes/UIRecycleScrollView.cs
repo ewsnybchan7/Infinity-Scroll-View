@@ -3,12 +3,22 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
-using System.Linq;
+using System;
+
+[Flags]
+public enum ScrollDirection
+{
+    NONE = 0x1,
+    LEFT = 0x2,
+    RIGHT = 0x4,
+    UP = 0x8,
+    DOWN = 0x10
+}
 
 public class UIRecycleScrollView : UIBehaviour
 {
     [SerializeField] private ScrollRect ScrollRect;
-    [SerializeField] private RectTransform ViewRect;
+    [SerializeField] private RectTransform Viewport;
     [SerializeField] private RectTransform Content;
 
     private List<IScrollCell> cellList;
@@ -20,6 +30,8 @@ public class UIRecycleScrollView : UIBehaviour
 
     private int startIndex = -1;
 
+    [SerializeField] Text ViewportText;
+
     protected override void OnEnable()
     {
         if (startIndex == -1)
@@ -27,6 +39,12 @@ public class UIRecycleScrollView : UIBehaviour
 
         SetUpCell();
         SetUpData();
+    }
+
+    public void Update()
+    {
+        ViewportText.text = $"AnchoredPosition: {Viewport.anchoredPosition}\n" +
+            $"Height: {Viewport.rect.height}";
     }
 
     public void SetData(List<IScrollData> InDataList)
@@ -84,8 +102,12 @@ public class UIRecycleScrollView : UIBehaviour
                 cellList.Add(cellComponent);
             }
 
-            Content.sizeDelta = new Vector2(Content.sizeDelta.x, height);
-
+            Content.anchorMin = Vector2.zero;
+            Content.anchorMax = Vector2.one;
+            Content.pivot = Vector2.one / 2;
+            Content.offsetMin = Vector2.zero;
+            Content.offsetMax = Vector2.zero;
+            
             return;
         }
     }
@@ -104,17 +126,18 @@ public class UIRecycleScrollView : UIBehaviour
 
         var cellIndex = cellList.IndexOf(InCell);
         
-        StartCoroutine(BindData(InCell, cellIndex));
+        StartCoroutine(InitializeData(InCell, cellIndex));
 
         while (true)
         {
             yield return waitYieldForIsData;
-
+            var bound = RectTransformUtility.CalculateRelativeRectTransformBounds(Viewport, InCell.RectTransform);
             //@TODO: 위치 확인 코드 데이터 교체
+            InCell.SetData(new TestData { text = $"{bound.min}, {bound.max} / {bound}" });
         }
     }
 
-    private IEnumerator BindData(IScrollCell cell, int index)
+    private IEnumerator InitializeData(IScrollCell cell, int index)
     {
         while(index >= dataList.Count)
             yield return null;
